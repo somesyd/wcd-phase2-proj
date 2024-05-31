@@ -33,11 +33,22 @@ resource "azurerm_storage_account" "proj-sa" {
   location                 = azurerm_resource_group.proj-rg.location
   account_tier             = "Standard"
   account_replication_type = "LRS"
+  account_kind             = "StorageV2"
   is_hns_enabled           = "true"
 
   tags = {
     environment = "dev"
   }
+}
+
+data "azurerm_subscription" "primary" {}
+
+data "azurerm_client_config" "current" {}
+
+resource "azurerm_role_assignment" "blob_contributor" {
+  scope                = data.azurerm_subscription.primary.id
+  role_definition_name = "Storage Blob Data Contributor"
+  principal_id         = data.azurerm_client_config.current.object_id
 }
 
 resource "azurerm_storage_data_lake_gen2_filesystem" "proj-fs" {
@@ -46,9 +57,9 @@ resource "azurerm_storage_data_lake_gen2_filesystem" "proj-fs" {
 }
 
 resource "azurerm_storage_data_lake_gen2_path" "proj-folders" {
-  for_each = toset(var.folders)
+  for_each = { for i, v in var.pg_tables : i => v }
 
-  path               = each.value
+  path               = each.value.folder
   filesystem_name    = azurerm_storage_data_lake_gen2_filesystem.proj-fs.name
   storage_account_id = azurerm_storage_account.proj-sa.id
   resource           = "directory"
@@ -76,4 +87,23 @@ resource "azurerm_data_factory_linked_service_azure_blob_storage" "my-blob-stora
   name              = "ls_my_blob"
   data_factory_id   = azurerm_data_factory.proj-adf.id
   connection_string = azurerm_storage_account.proj-sa.primary_connection_string
+}
+
+resource "azurerm_data_factory_dataset_postgresql" "proj_pg_dataset" {
+  for_each            = { for i, v in var.pg_tables : i => v }
+  name                = "ds_pg_${each.value.table}"
+  data_factory_id     = azurerm_data_factory.proj-adf.id
+  linked_service_name = azurerm_data_factory_linked_service_postgresql.rds-postgres-ls.name
+
+  table_name = "${var.pg_schema}.${each.value.table}"
+}
+
+resource "azurerm_data_factory_dataset_azure_blob" "proj_my_blob_dataset" {
+  for_each            = { for i, v in var.pg_tables : i => v }
+  name                = "ds_my_blob_${each.value.folder}"
+  data_factory_id     = azurerm_data_factory.proj-adf.id
+  linked_service_name = azurerm_data_factory_linked_service_azure_blob_storage.my-blob-storage-ls.name
+
+  path     = "${azurerm_storage_data_lake_gen2_filesystem.proj-fs.name}/${each.value.folder}"
+  filename = "${each.value.folder}.csv"
 }
