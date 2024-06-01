@@ -52,7 +52,7 @@ resource "azurerm_role_assignment" "blob_contributor" {
 }
 
 resource "azurerm_storage_data_lake_gen2_filesystem" "proj-fs" {
-  name               = "bd-project"
+  name               = var.my_blob_container
   storage_account_id = azurerm_storage_account.proj-sa.id
 }
 
@@ -60,6 +60,13 @@ resource "azurerm_storage_data_lake_gen2_path" "proj-folders" {
   for_each = { for i, v in var.pg_tables : i => v }
 
   path               = each.value.folder
+  filesystem_name    = azurerm_storage_data_lake_gen2_filesystem.proj-fs.name
+  storage_account_id = azurerm_storage_account.proj-sa.id
+  resource           = "directory"
+}
+
+resource "azurerm_storage_data_lake_gen2_path" "proj-pq-folder" {
+  path               = var.parquet_files.folder_name
   filesystem_name    = azurerm_storage_data_lake_gen2_filesystem.proj-fs.name
   storage_account_id = azurerm_storage_account.proj-sa.id
   resource           = "directory"
@@ -106,4 +113,26 @@ resource "azurerm_data_factory_dataset_azure_blob" "proj_my_blob_dataset" {
 
   path     = "${azurerm_storage_data_lake_gen2_filesystem.proj-fs.name}/${each.value.folder}"
   filename = "${each.value.folder}.csv"
+}
+
+resource "azurerm_data_factory_dataset_parquet" "proj_wcd_blob_dataset" {
+  name                = "ds_wcd_blob_pq"
+  data_factory_id     = azurerm_data_factory.proj-adf.id
+  linked_service_name = azurerm_data_factory_linked_service_azure_blob_storage.wcd-blob-storage-ls.name
+
+  azure_blob_storage_location {
+    container = var.wcd_blob_container
+    path      = var.wcd_blob_folder
+  }
+}
+
+resource "azurerm_data_factory_dataset_parquet" "proj_my_blob_pq_dataset" {
+  name                = "ds_my_blob_pq"
+  data_factory_id     = azurerm_data_factory.proj-adf.id
+  linked_service_name = azurerm_data_factory_linked_service_azure_blob_storage.my-blob-storage-ls.name
+
+  azure_blob_storage_location {
+    container = var.my_blob_container
+    path      = var.parquet_files.folder_name
+  }
 }

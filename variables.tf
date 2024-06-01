@@ -1,3 +1,9 @@
+variable "my_blob_container" {
+  description = "Container name for 'my' blob storage"
+  type        = string
+  default     = "bd-project"
+}
+
 variable "folders" {
   description = "List of folder names for Data Lake container"
   type        = set(string)
@@ -42,4 +48,15 @@ variable "wcd_blob_container" {
 variable "wcd_blob_folder" {
   description = "WCD blob storage folder name"
   type        = string
+}
+
+variable "parquet_files" {
+  description = "Config for parquet dataset files"
+  type = object({
+    folder_name = string
+  })
+  default = {
+    folder_name    = "review",
+    file_extension = ".parquet"
+  }
 }
