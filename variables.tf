@@ -50,6 +50,12 @@ variable "wcd_blob_folder" {
   type        = string
 }
 
+variable "service_principal_key" {
+  description = "Service provider key for my-data-lake storage"
+  type = string
+  sensitive = true
+}
+
 variable "parquet_files" {
   description = "Config for parquet dataset files"
   type = object({

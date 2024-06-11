@@ -90,10 +90,14 @@ resource "azurerm_data_factory_linked_service_azure_blob_storage" "wcd-blob-stor
   connection_string = "DefaultEndpointsProtocol=https;BlobEndpoint=https://${module.vault.wcd_blob_storage_account}.blob.core.windows.net;AccountName=${module.vault.wcd_blob_storage_account};AccountKey=${module.vault.wcd_blob_storage_key}"
 }
 
-resource "azurerm_data_factory_linked_service_azure_blob_storage" "my-blob-storage-ls" {
-  name              = "ls_my_blob"
+resource "azurerm_data_factory_linked_service_data_lake_storage_gen2" "my-data-lake-storage-ls" {
+  name              = "ls_my_data_lake"
   data_factory_id   = azurerm_data_factory.proj-adf.id
-  connection_string = azurerm_storage_account.proj-sa.primary_connection_string
+  
+  url = "https://${azurerm_storage_account.proj-sa.name}.dfs.core.windows.net"
+  service_principal_id  = data.azurerm_client_config.current.subscription_id
+  service_principal_key = var.service_principal_key
+  tenant = data.azurerm_client_config.current.tenant_id
 }
 
 resource "azurerm_data_factory_dataset_postgresql" "proj_pg_dataset" {
@@ -105,14 +109,21 @@ resource "azurerm_data_factory_dataset_postgresql" "proj_pg_dataset" {
   table_name = "${var.pg_schema}.${each.value.table}"
 }
 
-resource "azurerm_data_factory_dataset_azure_blob" "proj_my_blob_dataset" {
+resource "azurerm_data_factory_dataset_delimited_text" "proj_my_blob_dataset" {
   for_each            = { for i, v in var.pg_tables : i => v }
-  name                = "ds_my_blob_${each.value.folder}"
+  name                = "ds_my_data_lake_${each.value.folder}"
   data_factory_id     = azurerm_data_factory.proj-adf.id
-  linked_service_name = azurerm_data_factory_linked_service_azure_blob_storage.my-blob-storage-ls.name
+  linked_service_name = azurerm_data_factory_linked_service_data_lake_storage_gen2.my-data-lake-storage-ls.name
 
-  path     = "${azurerm_storage_data_lake_gen2_filesystem.proj-fs.name}/${each.value.folder}"
-  filename = "${each.value.folder}.csv"
+  azure_blob_storage_location {
+    container = "${azurerm_storage_data_lake_gen2_filesystem.proj-fs.name}"
+    path     = "${each.value.folder}"
+    filename = "${each.value.folder}.csv"
+  }
+
+  column_delimiter = ","
+  row_delimiter = "\n"
+  first_row_as_header = true
 }
 
 resource "azurerm_data_factory_dataset_parquet" "proj_wcd_blob_dataset" {
@@ -127,12 +138,53 @@ resource "azurerm_data_factory_dataset_parquet" "proj_wcd_blob_dataset" {
 }
 
 resource "azurerm_data_factory_dataset_parquet" "proj_my_blob_pq_dataset" {
-  name                = "ds_my_blob_pq"
+  name                = "ds_my_data_lake_pq"
   data_factory_id     = azurerm_data_factory.proj-adf.id
-  linked_service_name = azurerm_data_factory_linked_service_azure_blob_storage.my-blob-storage-ls.name
+  linked_service_name = azurerm_data_factory_linked_service_data_lake_storage_gen2.my-data-lake-storage-ls.name
 
   azure_blob_storage_location {
     container = var.my_blob_container
     path      = var.parquet_files.folder_name
   }
+}
+
+# generate pipeline activities
+locals {
+  activities = [
+    for tbl in var.pg_tables : {  
+      name = "copy_${tbl.table}"
+      type = "Copy"
+      inputs = [
+        {
+          referenceName = "ds_pg_${tbl.table}"
+          type = "DatasetReference"
+        }
+      ]
+      outputs = [
+        {
+          referenceName = "ds_my_data_lake_${tbl.folder}"
+          type = "DatasetReference"
+        }
+      ]
+      typeProperties = {
+        source = {
+          type = "PostgreSqlSource"
+          query = "SELECT * FROM ${var.pg_schema}.${tbl.table}"
+          linkedServiceName = azurerm_data_factory_linked_service_postgresql.rds-postgres-ls.name
+        }
+        sink = {
+          type = "DelimitedTextSink"
+          writeBehavior = "overwrite"
+          linkedServiceName = azurerm_data_factory_linked_service_data_lake_storage_gen2.my-data-lake-storage-ls.name
+        }
+      }
+    }
+  ]
+}
+
+resource "azurerm_data_factory_pipeline" "proj-pl-weekly" {
+  name            = "copyOnceWeek"
+  data_factory_id = azurerm_data_factory.proj-adf.id
+
+  activities_json = jsonencode(local.activities)
 }
