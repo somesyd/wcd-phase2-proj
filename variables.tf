@@ -52,8 +52,8 @@ variable "wcd_blob_folder" {
 
 variable "service_principal_key" {
   description = "Service provider key for my-data-lake storage"
-  type = string
-  sensitive = true
+  type        = string
+  sensitive   = true
 }
 
 variable "parquet_files" {
