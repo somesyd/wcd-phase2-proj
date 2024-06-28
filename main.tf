@@ -217,12 +217,22 @@ resource "azurerm_data_factory_dataset_parquet" "proj_my_blob_pq_dataset" {
 
 }
 
+
 #********* COPY-ONCE-A-WEEK PIPELINE ACTIVITIES **************
 locals {
-  weekly_activities = [
+  create_dependency1 = azurerm_data_factory_dataset_delimited_text.proj_my_blob_dataset
+  create_dependency2 = azapi_resource.proj_pg_dataset
+
+  weekly_copy_activities = [
     for tbl in var.pg_tables : {  
       name = "copy_${tbl.table}"
       type = "Copy"
+      dependsOn = [
+        {
+          activity = "delete_${tbl.folder}_files"
+          dependencyConditions = ["Succeeded"]
+        }
+      ]
       inputs = [
         {
           referenceName = "ds_pg_${tbl.table}"
@@ -239,13 +249,27 @@ locals {
         source = {
           type = "PostgreSqlV2Source"
           query = "SELECT * FROM ${var.pg_schema}.${tbl.table}"
-          linkedServiceName = "ls_rds_pg"
+          linkedServiceName = azapi_resource.rds-postgres-ls.name
         }
         sink = {
           type = "DelimitedTextSink"
           writeBehavior = "overwrite"
           linkedServiceName = azurerm_data_factory_linked_service_data_lake_storage_gen2.my-data-lake-storage-ls.name
         }
+      }
+    }
+  ]
+
+  weekly_delete_activities = [
+      for tbl in var.pg_tables : {
+      name = "delete_${tbl.folder}_files"
+      type = "Delete"
+      typeProperties = {
+        dataset = {
+          referenceName = "ds_my_data_lake_${tbl.folder}"
+          type = "DatasetReference"
+        }
+        enableLogging = false
       }
     }
   ]
@@ -258,7 +282,7 @@ resource "azapi_resource" "pipeline" {
   name      = "copyOnceWeek"
   body = {
     properties = {
-      activities = local.weekly_activities
+      activities = concat(local.weekly_copy_activities, local.weekly_delete_activities)
     }
   }
   schema_validation_enabled = false
