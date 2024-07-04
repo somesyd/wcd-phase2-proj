@@ -4,12 +4,8 @@ terraform {
       source  = "hashicorp/azurerm"
       version = "3.109.0"
     }
-    azuread = {
-      source  = "hashicorp/azuread"
-      version = "2.51.0"
-    }
     azapi = {
-      source = "Azure/azapi"
+      source  = "Azure/azapi"
       version = "1.13.1"
     }
   }
@@ -22,7 +18,6 @@ provider "azurerm" {
       purge_soft_delete_on_destroy    = true
       recover_soft_deleted_key_vaults = true
     }
-
   }
 }
 
@@ -35,46 +30,22 @@ module "vault" {
   source = "./modules/vault"
 }
 
-resource "azurerm_storage_account" "proj-sa" {
-  name                      = "phase2projectstorage"
-  resource_group_name       = azurerm_resource_group.proj-rg.name
-  location                  = azurerm_resource_group.proj-rg.location
-  account_tier              = "Standard"
-  account_replication_type  = "LRS"
-  account_kind              = "StorageV2"
-  is_hns_enabled            = true
-  shared_access_key_enabled = true
+module "storage" {
+  source              = "./modules/storage"
+  resource_group_name = azurerm_resource_group.proj-rg.name
+  pg_tables           = var.pg_tables
+  parquet_files       = var.parquet_files
+}
 
-  tags = {
-    environment = "dev"
-  }
+module "databricks" {
+  source                  = "./modules/databricks"
+  subscription_id         = data.azurerm_subscription.primary.subscription_id
+  resource_group_name     = azurerm_resource_group.proj-rg.name
+  databricks_account_id   = module.vault.databricks_account_id
+  databricks_metastore_id = module.vault.databricks_metastore_id
 }
 
 data "azurerm_subscription" "primary" {}
-
-data "azurerm_client_config" "current" {}
-
-
-resource "azurerm_storage_data_lake_gen2_filesystem" "proj-fs" {
-  name               = var.my_blob_container
-  storage_account_id = azurerm_storage_account.proj-sa.id
-}
-
-resource "azurerm_storage_data_lake_gen2_path" "proj-folders" {
-  for_each = { for i, v in var.pg_tables : i => v }
-
-  path               = each.value.folder
-  filesystem_name    = azurerm_storage_data_lake_gen2_filesystem.proj-fs.name
-  storage_account_id = azurerm_storage_account.proj-sa.id
-  resource           = "directory"
-}
-
-resource "azurerm_storage_data_lake_gen2_path" "proj-pq-folder" {
-  path               = var.parquet_files.folder_name
-  filesystem_name    = azurerm_storage_data_lake_gen2_filesystem.proj-fs.name
-  storage_account_id = azurerm_storage_account.proj-sa.id
-  resource           = "directory"
-}
 
 resource "azurerm_data_factory" "proj-adf" {
   name                = "phase2-project-adf"
@@ -88,49 +59,28 @@ resource "azurerm_data_factory" "proj-adf" {
 
 resource "azurerm_role_assignment" "adf_blob_contributor" {
   principal_id         = azurerm_data_factory.proj-adf.identity[0].principal_id
-  scope                = azurerm_storage_account.proj-sa.id
+  scope                = module.storage.storage_account_id
   role_definition_name = "Storage Blob Data Contributor"
   principal_type       = "ServicePrincipal"
 }
 
-resource "azurerm_databricks_workspace" "proj-db-ws" {
-  name                = "phase2-project-db"
-  resource_group_name = azurerm_resource_group.proj-rg.name
-  location            = azurerm_resource_group.proj-rg.location
-  sku                 = "standard"
-}
 
-resource "azurerm_databricks_access_connector" "proj-db-ac" {
-  name                = "databricks-access-connector"
-  resource_group_name = azurerm_resource_group.proj-rg.name
-  location            = azurerm_resource_group.proj-rg.location
-
-  identity {
-    type = "SystemAssigned"
-  }
-}
-
-resource "azurerm_role_assignment" "databricks-blob-contributor" {
-  scope                = azurerm_storage_account.proj-sa.id
-  role_definition_name = "Storage Blob Data Contributor"
-  principal_id         = azurerm_databricks_access_connector.proj-db-ac.identity[0].principal_id
-}
 
 # ********** RDS-POSTGRES-LINKED-SERVICE ****************************
 resource "azapi_resource" "rds-postgres-ls" {
-  type = "Microsoft.DataFactory/factories/linkedservices@2018-06-01"
+  type      = "Microsoft.DataFactory/factories/linkedservices@2018-06-01"
   parent_id = azurerm_data_factory.proj-adf.id
-  name = "ls_rds_pg"
+  name      = "ls_rds_pg"
   body = {
     properties = {
       type = "PostgreSqlV2"
       typeProperties = {
-        server = var.pg_host_name
-        port = 5432
+        server   = var.pg_host_name
+        port     = 5432
         database = var.pg_database_name
         username = module.vault.pg_username
-        password =  {
-          type = "SecureString"
+        password = {
+          type  = "SecureString"
           value = module.vault.pg_password
         }
         authenticationType = "Basic"
@@ -150,29 +100,29 @@ resource "azurerm_data_factory_linked_service_azure_blob_storage" "wcd-blob-stor
 resource "azurerm_data_factory_linked_service_data_lake_storage_gen2" "my-data-lake-storage-ls" {
   name                 = "ls_my_data_lake"
   data_factory_id      = azurerm_data_factory.proj-adf.id
-  url                  = azurerm_storage_account.proj-sa.primary_dfs_endpoint
+  url                  = module.storage.storage_account_dfs_endpoint
   use_managed_identity = true
 }
 
 resource "azapi_resource" "proj_pg_dataset" {
-  for_each = { for i, v in var.pg_tables : i => v }
+  for_each  = { for i, v in var.pg_tables : i => v }
   type      = "Microsoft.DataFactory/factories/datasets@2018-06-01"
-  name = "ds_pg_${each.value.table}"
+  name      = "ds_pg_${each.value.table}"
   parent_id = azurerm_data_factory.proj-adf.id
   body = {
     properties = {
       type = "PostgreSqlV2Table"
       linkedServiceName = {
         referenceName = "ls_rds_pg"
-        type = "LinkedServiceReference"
+        type          = "LinkedServiceReference"
       }
       typeProperties = {
         schema = var.pg_schema
-        table = each.value.table
+        table  = each.value.table
       }
     }
   }
-  depends_on = [ azapi_resource.rds-postgres-ls ]
+  depends_on = [azapi_resource.rds-postgres-ls]
 }
 
 resource "azurerm_data_factory_dataset_delimited_text" "proj_my_blob_dataset" {
@@ -182,7 +132,7 @@ resource "azurerm_data_factory_dataset_delimited_text" "proj_my_blob_dataset" {
   linked_service_name = azurerm_data_factory_linked_service_data_lake_storage_gen2.my-data-lake-storage-ls.name
 
   azure_blob_storage_location {
-    container = azurerm_storage_data_lake_gen2_filesystem.proj-fs.name
+    container = module.storage.storage_container_name
     path      = each.value.folder
     filename  = "${each.value.folder}.csv"
   }
@@ -211,12 +161,11 @@ resource "azurerm_data_factory_dataset_parquet" "proj_my_blob_pq_dataset" {
   compression_codec   = "snappy"
 
   azure_blob_storage_location {
-    container = var.my_blob_container
+    container = module.storage.storage_container_name
     path      = var.parquet_files.folder_name
   }
 
 }
-
 
 #********* COPY-ONCE-A-WEEK PIPELINE ACTIVITIES **************
 locals {
@@ -224,36 +173,36 @@ locals {
   create_dependency2 = azapi_resource.proj_pg_dataset
 
   weekly_copy_activities = [
-    for tbl in var.pg_tables : {  
+    for tbl in var.pg_tables : {
       name = "copy_${tbl.table}"
       type = "Copy"
       dependsOn = [
         {
-          activity = "delete_${tbl.folder}_files"
+          activity             = "delete_${tbl.folder}_files"
           dependencyConditions = ["Succeeded"]
         }
       ]
       inputs = [
         {
           referenceName = "ds_pg_${tbl.table}"
-          type = "DatasetReference"
+          type          = "DatasetReference"
         }
       ]
       outputs = [
         {
           referenceName = "ds_my_data_lake_${tbl.folder}"
-          type = "DatasetReference"
+          type          = "DatasetReference"
         }
       ]
       typeProperties = {
         source = {
-          type = "PostgreSqlV2Source"
-          query = "SELECT * FROM ${var.pg_schema}.${tbl.table}"
+          type              = "PostgreSqlV2Source"
+          query             = "SELECT * FROM ${var.pg_schema}.${tbl.table}"
           linkedServiceName = azapi_resource.rds-postgres-ls.name
         }
         sink = {
-          type = "DelimitedTextSink"
-          writeBehavior = "overwrite"
+          type              = "DelimitedTextSink"
+          writeBehavior     = "overwrite"
           linkedServiceName = azurerm_data_factory_linked_service_data_lake_storage_gen2.my-data-lake-storage-ls.name
         }
       }
@@ -261,13 +210,13 @@ locals {
   ]
 
   weekly_delete_activities = [
-      for tbl in var.pg_tables : {
+    for tbl in var.pg_tables : {
       name = "delete_${tbl.folder}_files"
       type = "Delete"
       typeProperties = {
         dataset = {
           referenceName = "ds_my_data_lake_${tbl.folder}"
-          type = "DatasetReference"
+          type          = "DatasetReference"
         }
         enableLogging = false
       }
@@ -288,10 +237,10 @@ resource "azapi_resource" "pipeline" {
   schema_validation_enabled = false
   response_export_values    = ["*"]
 
-   depends_on = [ 
+  depends_on = [
     azapi_resource.rds-postgres-ls,
     azapi_resource.proj_pg_dataset
-    ]
+  ]
 }
 
 # ********* COPY-DAILY PIPELINE ACTIVITIES **************

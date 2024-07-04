@@ -48,3 +48,23 @@ output "wcd_blob_storage_key" {
   value     = data.azurerm_key_vault_secret.wcd-blob-storage-key.value
   sensitive = true
 }
+
+data "azurerm_key_vault_secret" "databricks-account-id" {
+  name         = "DatabricksAccountId"
+  key_vault_id = data.azurerm_key_vault.proj-kv.id
+}
+
+output "databricks_account_id" {
+  value     = data.azurerm_key_vault_secret.databricks-account-id.value
+  sensitive = true
+}
+
+data "azurerm_key_vault_secret" "databricks-metastore-id" {
+  name         = "DatabricksMetastoreId"
+  key_vault_id = data.azurerm_key_vault.proj-kv.id
+}
+
+output "databricks_metastore_id" {
+  value     = data.azurerm_key_vault_secret.databricks-metastore-id.value
+  sensitive = true
+}
