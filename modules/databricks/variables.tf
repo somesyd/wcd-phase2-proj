@@ -15,3 +15,34 @@ variable "databricks_metastore_id" {
   description = "Azure Databricks metastore id"
   type        = string
 }
+
+variable "storage_account_name" {
+  description = "The project storage account name"
+  type        = string
+}
+
+variable "raw_storage_container" {
+  description = "The project's raw data storage container name"
+  type        = string
+}
+
+variable "layer2_storage_container" {
+  description = "Project's second layer storage container name"
+  type        = string
+}
+
+variable "layer3_storage_container" {
+  description = "Project's third layer storage container name"
+  type        = string
+}
+
+variable "meta_storage_container" {
+  description = "Storage container name for project catalog"
+  type        = string
+}
+
+variable "my_databricks_id" {
+  description = "TO_DELETE"
+  default     = "folts@hotmail.com"
+  sensitive   = true
+}

@@ -21,6 +21,12 @@ variable "third_level_container_name" {
   default     = "gold"
 }
 
+variable "meta_container_name" {
+  description = "Container name for databricks catalog"
+  type        = string
+  default     = "meta"
+}
+
 variable "folders" {
   description = "List of folder names for Data Lake container"
   type        = set(string)

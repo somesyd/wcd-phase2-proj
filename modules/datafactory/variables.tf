@@ -9,13 +9,13 @@ variable "location" {
 }
 
 variable "storage_account_id" {
-    description = "Project storage account id for Data Lake"
-    type = string
+  description = "Project storage account id for Data Lake"
+  type        = string
 }
 
 variable "storage_account_dfs_endpoint" {
-    description = "Project storage account Data Lake endpoint"
-    type = string
+  description = "Project storage account Data Lake endpoint"
+  type        = string
 }
 
 variable "storage_container_name" {
@@ -42,8 +42,8 @@ variable "pg_database_name" {
 }
 
 variable "pg_schema" {
-    description = "Schema name for Postgres dataset"
-    type = string
+  description = "Schema name for Postgres dataset"
+  type        = string
 }
 
 variable "wcd_blob_container" {
@@ -64,25 +64,25 @@ variable "parquet_files" {
 }
 
 variable "pg_username" {
-    description = "User name for Postgres source database"
-    type = string
-    sensitive = true
+  description = "User name for Postgres source database"
+  type        = string
+  sensitive   = true
 }
 
 variable "pg_password" {
-    description = "Password for Postgres source database access"
-    type = string
-    sensitive = true
+  description = "Password for Postgres source database access"
+  type        = string
+  sensitive   = true
 }
 
 variable "wcd_blob_storage_account" {
-    description = "WCD blob storage account name"
-    type = string
-    sensitive = true
+  description = "WCD blob storage account name"
+  type        = string
+  sensitive   = true
 }
 
 variable "wcd_blob_storage_key" {
-    description = "WCD blob storage account key"
-    type = string
-    sensitive = true
+  description = "WCD blob storage account key"
+  type        = string
+  sensitive   = true
 }

@@ -29,11 +29,16 @@ module "storage" {
 }
 
 module "databricks" {
-  source                  = "./modules/databricks"
-  subscription_id         = data.azurerm_subscription.primary.subscription_id
-  resource_group_name     = azurerm_resource_group.proj-rg.name
-  databricks_account_id   = module.vault.databricks_account_id
-  databricks_metastore_id = module.vault.databricks_metastore_id
+  source                   = "./modules/databricks"
+  subscription_id          = data.azurerm_subscription.primary.subscription_id
+  resource_group_name      = azurerm_resource_group.proj-rg.name
+  databricks_account_id    = module.vault.databricks_account_id
+  databricks_metastore_id  = module.vault.databricks_metastore_id
+  storage_account_name     = module.storage.storage_account_name
+  raw_storage_container    = module.storage.storage_container_layer1_name
+  layer2_storage_container = module.storage.storage_container_layer2_name
+  layer3_storage_container = module.storage.storage_container_layer3_name
+  meta_storage_container   = module.storage.storage_container_meta_name
 }
 
 module "datafactory" {
@@ -42,7 +47,7 @@ module "datafactory" {
   location                     = azurerm_resource_group.proj-rg.location
   storage_account_id           = module.storage.storage_account_id
   storage_account_dfs_endpoint = module.storage.storage_account_dfs_endpoint
-  storage_container_name       = module.storage.storage_container_name
+  storage_container_name       = module.storage.storage_container_layer1_name
   pg_tables                    = var.pg_tables
   pg_schema                    = var.pg_schema
   parquet_files                = var.parquet_files
