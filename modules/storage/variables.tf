@@ -27,6 +27,12 @@ variable "meta_container_name" {
   default     = "meta"
 }
 
+# variable "sources_container_name" {
+#   description = "Container name for dev tools and sources"
+#   type = string
+#   default = "sources"
+# }
+
 variable "folders" {
   description = "List of folder names for Data Lake container"
   type        = set(string)

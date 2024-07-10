@@ -8,6 +8,10 @@ terraform {
       source  = "databricks/databricks"
       version = "1.48.0"
     }
+    azuread = {
+      source  = "hashicorp/azuread"
+      version = "2.53.1"
+    }
   }
 }
 
@@ -71,6 +75,18 @@ data "azurerm_storage_container" "meta" {
   storage_account_name = var.storage_account_name
 }
 
+resource "azurerm_storage_data_lake_gen2_filesystem" "sources" {
+  name               = "sources"
+  storage_account_id = data.azurerm_storage_account.this.id
+}
+
+resource "azurerm_storage_data_lake_gen2_path" "volume" {
+  path               = "landing"
+  filesystem_name    = azurerm_storage_data_lake_gen2_filesystem.sources.name
+  storage_account_id = data.azurerm_storage_account.this.id
+  resource           = "directory"
+}
+
 resource "azurerm_databricks_workspace" "proj-db-ws" {
   name                = "proj-phase2-databricks"
   resource_group_name = data.azurerm_resource_group.this.name
@@ -123,6 +139,7 @@ resource "databricks_mws_permission_assignment" "workspace_user_group" {
   permissions  = ["ADMIN"]
 }
 
+# storage credential for unity-catalog
 resource "databricks_storage_credential" "external" {
   name = azurerm_databricks_access_connector.ext_access_connector.name
   azure_managed_identity {
@@ -147,6 +164,7 @@ resource "databricks_external_location" "raw" {
 
   credential_name = databricks_storage_credential.external.id
   comment         = "Managed by TF"
+  owner           = databricks_group.data_eng.display_name
   depends_on = [
     databricks_metastore_assignment.this
   ]
@@ -161,6 +179,7 @@ resource "databricks_external_location" "layer2" {
 
   credential_name = databricks_storage_credential.external.id
   comment         = "Managed by TF"
+  owner           = databricks_group.data_eng.display_name
   depends_on = [
     databricks_metastore_assignment.this
   ]
@@ -175,6 +194,7 @@ resource "databricks_external_location" "layer3" {
 
   credential_name = databricks_storage_credential.external.id
   comment         = "Managed by TF"
+  owner           = databricks_group.data_eng.display_name
   depends_on = [
     databricks_metastore_assignment.this
   ]
@@ -189,18 +209,53 @@ resource "databricks_external_location" "meta" {
 
   credential_name = databricks_storage_credential.external.id
   comment         = "Managed by TF"
+  owner           = databricks_group.data_eng.display_name
   depends_on = [
     databricks_metastore_assignment.this
   ]
 }
 
+resource "databricks_external_location" "sources" {
+  name     = "sources"
+  provider = databricks.workspace
+  url = format("abfss://%s@%s.dfs.core.windows.net",
+    azurerm_storage_data_lake_gen2_filesystem.sources.name,
+  data.azurerm_storage_account.this.name)
+
+  credential_name = databricks_storage_credential.external.id
+  comment         = "Managed by TF"
+  depends_on = [
+    databricks_metastore_assignment.this
+  ]
+  owner = databricks_group.data_eng.display_name
+}
+
 resource "databricks_catalog" "dev" {
-  name         = "phase2_proj_dev"
+  name         = "unity_catalog"
   provider     = databricks.workspace
   metastore_id = var.databricks_metastore_id
   storage_root = databricks_external_location.meta.url
   owner        = "Data Engineers"
   comment      = "Managed by TF"
+}
+
+resource "databricks_schema" "sources" {
+  name         = "sources"
+  provider     = databricks.workspace
+  catalog_name = databricks_catalog.dev.id
+  comment      = "Managed by TF"
+  owner        = "Data Engineers"
+  storage_root = databricks_external_location.sources.url
+}
+
+resource "databricks_volume" "landing" {
+  name             = "landing"
+  provider         = databricks.workspace
+  catalog_name     = databricks_catalog.dev.name
+  schema_name      = databricks_schema.sources.name
+  volume_type      = "EXTERNAL"
+  storage_location = "${databricks_external_location.sources.url}${azurerm_storage_data_lake_gen2_path.volume.path}"
+  comment          = "Managed by TF"
 }
 
 resource "databricks_schema" "raw" {
@@ -230,6 +285,7 @@ resource "databricks_schema" "layer3" {
   storage_root = databricks_external_location.layer3.url
 }
 
+# **** SET UP CLUSTER *********************
 data "databricks_node_type" "smallest" {}
 
 data "databricks_spark_version" "latest_lts" {
@@ -244,4 +300,5 @@ resource "databricks_cluster" "small" {
   spark_version           = data.databricks_spark_version.latest_lts.id
   autotermination_minutes = 30
   num_workers             = 2
+  data_security_mode      = "USER_ISOLATION"
 }

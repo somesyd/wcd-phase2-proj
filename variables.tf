@@ -48,3 +48,11 @@ variable "parquet_files" {
     file_extension = ".parquet"
   }
 }
+
+variable "external_key_vault_resource_group" {
+  description = "Name of resource group for external key vault"
+}
+
+variable "external_key_vault_name" {
+  description = "Name of the external key vault"
+}

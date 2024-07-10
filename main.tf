@@ -18,7 +18,10 @@ provider "azurerm" {
 }
 
 module "vault" {
-  source = "./modules/vault"
+  source                            = "./modules/vault"
+  resource_group_name               = azurerm_resource_group.proj-rg.name
+  external_key_vault_resource_group = var.external_key_vault_resource_group
+  external_key_vault_name           = var.external_key_vault_name
 }
 
 module "storage" {
@@ -39,6 +42,9 @@ module "databricks" {
   layer2_storage_container = module.storage.storage_container_layer2_name
   layer3_storage_container = module.storage.storage_container_layer3_name
   meta_storage_container   = module.storage.storage_container_meta_name
+  # sources_storage_container = module.storage.storage_container_sources_name
+  # internal_key_vault_name = module.vault.internal_key_vault_name
+  # depends_on_internal_vault = module.vault.internal_vault_id
 }
 
 module "datafactory" {
@@ -59,6 +65,16 @@ module "datafactory" {
   wcd_blob_storage_key         = module.vault.wcd_blob_storage_key
   wcd_blob_container           = var.wcd_blob_container
   wcd_blob_folder              = var.wcd_blob_folder
+}
+
+module "synapse" {
+  source                            = "./modules/synapse"
+  resource_group_name               = azurerm_resource_group.proj-rg.name
+  data_lake_container               = module.storage.storage_container_layer3_id
+  internal_key_vault_name           = module.vault.internal_key_vault_name
+  depends_on_internal_vault         = module.vault.internal_vault_id
+  external_key_vault_resource_group = var.external_key_vault_resource_group
+  external_key_vault_name           = var.external_key_vault_name
 }
 
 data "azurerm_subscription" "primary" {}
