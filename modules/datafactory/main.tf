@@ -2,7 +2,7 @@ terraform {
   required_providers {
     azurerm = {
       source  = "hashicorp/azurerm"
-      version = "3.109.0"
+      version = "3.111.0"
     }
     azapi = {
       source  = "Azure/azapi"
@@ -207,6 +207,21 @@ resource "azapi_resource" "pipeline" {
   ]
 }
 
+resource "azurerm_data_factory_trigger_schedule" "weekly" {
+  name = "once-a-week"
+  data_factory_id = azurerm_data_factory.this.id
+  pipeline_name = azapi_resource.pipeline.name
+
+  time_zone = "Pacific Standard Time"
+  frequency = "Week"
+  interval = 1
+  schedule {
+    days_of_week = ["Wednesday"]
+    hours = [21]
+    minutes = [07]
+  }
+}
+
 # ********* COPY-DAILY PIPELINE ACTIVITIES **************
 locals {
   daily_activities = [
@@ -266,4 +281,18 @@ resource "azurerm_data_factory_pipeline" "proj-pl-daily" {
   data_factory_id = azurerm_data_factory.this.id
 
   activities_json = jsonencode(local.daily_activities)
+}
+
+resource "azurerm_data_factory_trigger_schedule" "daily" {
+  name = "once-a-day"
+  data_factory_id = azurerm_data_factory.this.id
+  pipeline_name = azurerm_data_factory_pipeline.proj-pl-daily.name
+
+  time_zone = "Pacific Standard Time"
+  frequency = "Day"
+  interval = 1
+  schedule {
+    hours = [21]
+    minutes = [14]
+  }
 }

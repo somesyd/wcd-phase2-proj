@@ -2,8 +2,8 @@ variable "resource_group_name" {
   description = "Project resource group name"
 }
 
-variable "data_lake_container" {
-  description = "Storage container id for gold/layer3 storage"
+variable "storage_account_name" {
+  description = "Project storage account name"
 }
 
 variable "internal_key_vault_name" {
@@ -20,4 +20,8 @@ variable "external_key_vault_resource_group" {
 
 variable "external_key_vault_name" {
   description = "Name of the external key vault"
+}
+
+variable "admin_login" {
+    description = "Azure login name (probably email address)"
 }

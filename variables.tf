@@ -56,3 +56,7 @@ variable "external_key_vault_resource_group" {
 variable "external_key_vault_name" {
   description = "Name of the external key vault"
 }
+
+variable "my_azure_login_name" {
+  description = "Azure login name (probably email address)"
+}

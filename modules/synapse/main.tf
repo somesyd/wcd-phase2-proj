@@ -2,7 +2,7 @@ terraform {
   required_providers {
     azurerm = {
       source  = "hashicorp/azurerm"
-      version = "3.109.0"
+      version = "3.111.0"
     }
   }
 }
@@ -29,6 +29,18 @@ data "azurerm_key_vault_secret" "sql-password" {
   key_vault_id = data.azurerm_key_vault.external-kv.id
 }
 
+# create storage container for Synapse data
+data "azurerm_storage_account" "this" {
+  name = var.storage_account_name
+  resource_group_name = data.azurerm_resource_group.this.name
+}
+
+resource "azurerm_storage_data_lake_gen2_filesystem" "this" {
+  name               = "synapse"
+  storage_account_id = data.azurerm_storage_account.this.id
+}
+
+
 # internal key vault for synapse workspace
 data "azurerm_key_vault" "internal" {
   name                = var.internal_key_vault_name
@@ -37,30 +49,6 @@ data "azurerm_key_vault" "internal" {
     var.depends_on_internal_vault
   ]
 }
-
-# resource "azurerm_key_vault" "this" {
-#     name = "phase2-proj-synapse-kv"
-#     location = data.azurerm_resource_group.this.location
-#     resource_group_name = data.azurerm_resource_group.this.name
-#     tenant_id = data.azurerm_client_config.current.tenant_id
-#     soft_delete_retention_days = 7
-#     sku_name = "standard"
-#     purge_protection_enabled = true
-# }
-
-# resource "azurerm_key_vault_access_policy" "deployer" {
-#     key_vault_id = data.azurerm_key_vault.internal.id
-#     tenant_id = data.azurerm_client_config.current.tenant_id
-#     object_id = data.azurerm_client_config.current.object_id
-
-#     key_permissions = [
-#         "Get", "List", "Update", "Create", "Import", "Delete", "Recover", "Backup", "Restore", "GetRotationPolicy"
-#     ]
-
-#     secret_permissions = [
-#         "Backup", "Delete", "Get", "List", "Purge", "Recover", "Restore", "Set"
-#     ]
-# }
 
 resource "azurerm_key_vault_key" "workspace-key" {
   name         = "SynapseWorkspaceKey"
@@ -76,7 +64,7 @@ resource "azurerm_synapse_workspace" "this" {
   name                                 = "phase2-proj-synapse"
   resource_group_name                  = data.azurerm_resource_group.this.name
   location                             = data.azurerm_resource_group.this.location
-  storage_data_lake_gen2_filesystem_id = var.data_lake_container
+  storage_data_lake_gen2_filesystem_id = azurerm_storage_data_lake_gen2_filesystem.this.id
   sql_administrator_login              = data.azurerm_key_vault_secret.sql-user.value
   sql_administrator_login_password     = data.azurerm_key_vault_secret.sql-password.value
 
@@ -100,6 +88,13 @@ resource "azurerm_key_vault_access_policy" "workspace-policy" {
   ]
 }
 
+resource "azurerm_synapse_firewall_rule" "this" {
+  name                 = "AllowAll"
+  synapse_workspace_id = azurerm_synapse_workspace.this.id
+  start_ip_address     = "0.0.0.0"
+  end_ip_address       = "255.255.255.255"
+}
+
 resource "azurerm_synapse_workspace_key" "this" {
   customer_managed_key_versionless_id = azurerm_key_vault_key.workspace-key.versionless_id
   synapse_workspace_id                = azurerm_synapse_workspace.this.id
@@ -112,9 +107,50 @@ resource "azurerm_synapse_workspace_key" "this" {
 
 resource "azurerm_synapse_workspace_aad_admin" "this" {
   synapse_workspace_id = azurerm_synapse_workspace.this.id
-  login                = "AzureAD Admin"
+  login                = var.admin_login
   object_id            = data.azurerm_client_config.current.object_id
   tenant_id            = data.azurerm_client_config.current.tenant_id
+  depends_on = [
+    azurerm_synapse_workspace_key.this
+  ]
+}
+
+resource "azurerm_synapse_workspace_sql_aad_admin" "example" {
+  synapse_workspace_id = azurerm_synapse_workspace.this.id
+  login                = var.admin_login
+  object_id            = data.azurerm_client_config.current.object_id
+  tenant_id            = data.azurerm_client_config.current.tenant_id
+  depends_on = [
+    azurerm_synapse_workspace_key.this
+  ]
+}
+
+resource "azurerm_synapse_spark_pool" "small" {
+  name                 = "smallSparkPool"
+  synapse_workspace_id = azurerm_synapse_workspace.this.id
+  node_size_family     = "MemoryOptimized"
+  node_size            = "Small"
+  node_count = 3
+  dynamic_executor_allocation_enabled = false
+  spark_version = "3.4"
+
+  auto_pause {
+    delay_in_minutes = 15
+  }
+
+  depends_on = [
+    azurerm_synapse_workspace_key.this
+  ]
+}
+
+resource "azurerm_synapse_sql_pool" "small" {
+  name                 = "smallsqlpool"
+  synapse_workspace_id = azurerm_synapse_workspace.this.id
+  sku_name             = "DW100c"
+  create_mode          = "Default"
+  storage_account_type = "LRS"
+  geo_backup_policy_enabled = false
+
   depends_on = [
     azurerm_synapse_workspace_key.this
   ]

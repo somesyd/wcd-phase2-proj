@@ -41,6 +41,11 @@ variable "meta_storage_container" {
   type        = string
 }
 
+variable "synapse_container" {
+  description = "Storage container name for Synapse data"
+  type = string
+}
+
 # variable "sources_storage_container" {
 #   description = "Storage container name for dev tools and sources"
 #   type = string
@@ -56,7 +61,6 @@ variable "meta_storage_container" {
 # }
 
 variable "my_databricks_id" {
-  description = "TO_DELETE"
-  default     = "folts@hotmail.com"
+  description = "Azure login name (probably email address)"
   sensitive   = true
 }

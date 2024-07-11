@@ -2,7 +2,7 @@ terraform {
   required_providers {
     azurerm = {
       source  = "hashicorp/azurerm"
-      version = "3.109.0"
+      version = "3.111.0"
     }
     databricks = {
       source  = "databricks/databricks"
@@ -285,6 +285,49 @@ resource "databricks_schema" "layer3" {
   storage_root = databricks_external_location.layer3.url
 }
 
+# Synapse Container connection
+resource "databricks_external_location" "synapse" {
+  name     = "synapse"
+  provider = databricks.workspace
+  url = format("abfss://%s@%s.dfs.core.windows.net",
+    var.synapse_container,
+  data.azurerm_storage_account.this.name)
+
+  credential_name = databricks_storage_credential.external.id
+  comment         = "Managed by TF"
+  depends_on = [
+    databricks_metastore_assignment.this
+  ]
+  owner = databricks_group.data_eng.display_name
+}
+
+resource "azurerm_storage_data_lake_gen2_path" "synapse" {
+  path               = "data"
+  filesystem_name    = var.synapse_container
+  storage_account_id = data.azurerm_storage_account.this.id
+  resource           = "directory"
+}
+
+resource "databricks_schema" "synapse" {
+  name         = "synapse"
+  provider     = databricks.workspace
+  catalog_name = databricks_catalog.dev.id
+  comment      = "Managed by TF"
+  owner        = "Data Engineers"
+  storage_root = databricks_external_location.synapse.url
+}
+
+resource "databricks_volume" "synapse" {
+  name             = "data"
+  provider         = databricks.workspace
+  catalog_name     = databricks_catalog.dev.name
+  schema_name      = databricks_schema.synapse.name
+  volume_type      = "EXTERNAL"
+  storage_location = "${databricks_external_location.synapse.url}${azurerm_storage_data_lake_gen2_path.synapse.path}"
+  comment          = "Managed by TF"
+}
+
+
 # **** SET UP CLUSTER *********************
 data "databricks_node_type" "smallest" {}
 
@@ -300,5 +343,8 @@ resource "databricks_cluster" "small" {
   spark_version           = data.databricks_spark_version.latest_lts.id
   autotermination_minutes = 30
   num_workers             = 2
-  data_security_mode      = "USER_ISOLATION"
+
+  # single_user set up for ability to use ML features & unity-catalog
+  data_security_mode      = "SINGLE_USER" 
+  single_user_name = var.my_databricks_id
 }
