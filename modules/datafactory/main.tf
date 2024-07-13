@@ -208,17 +208,17 @@ resource "azapi_resource" "pipeline" {
 }
 
 resource "azurerm_data_factory_trigger_schedule" "weekly" {
-  name = "once-a-week"
+  name            = "once-a-week"
   data_factory_id = azurerm_data_factory.this.id
-  pipeline_name = azapi_resource.pipeline.name
+  pipeline_name   = azapi_resource.pipeline.name
 
   time_zone = "Pacific Standard Time"
   frequency = "Week"
-  interval = 1
+  interval  = 1
   schedule {
-    days_of_week = ["Wednesday"]
-    hours = [21]
-    minutes = [07]
+    days_of_week = ["Saturday"]
+    hours        = [01]
+    minutes      = [07]
   }
 }
 
@@ -284,15 +284,15 @@ resource "azurerm_data_factory_pipeline" "proj-pl-daily" {
 }
 
 resource "azurerm_data_factory_trigger_schedule" "daily" {
-  name = "once-a-day"
+  name            = "once-a-day"
   data_factory_id = azurerm_data_factory.this.id
-  pipeline_name = azurerm_data_factory_pipeline.proj-pl-daily.name
+  pipeline_name   = azurerm_data_factory_pipeline.proj-pl-daily.name
 
   time_zone = "Pacific Standard Time"
   frequency = "Day"
-  interval = 1
+  interval  = 1
   schedule {
-    hours = [21]
+    hours   = [01]
     minutes = [14]
   }
 }

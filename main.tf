@@ -42,8 +42,8 @@ module "databricks" {
   layer2_storage_container = module.storage.storage_container_layer2_name
   layer3_storage_container = module.storage.storage_container_layer3_name
   meta_storage_container   = module.storage.storage_container_meta_name
-  synapse_container = module.synapse.synapse_storage_container_name
-  my_databricks_id = var.my_azure_login_name
+  synapse_container        = module.synapse.synapse_storage_container_name
+  my_databricks_id         = var.my_azure_login_name
 }
 
 module "datafactory" {
@@ -69,13 +69,12 @@ module "datafactory" {
 module "synapse" {
   source                            = "./modules/synapse"
   resource_group_name               = azurerm_resource_group.proj-rg.name
-  storage_account_name = module.storage.storage_account_name
-  # data_lake_container               = module.storage.storage_container_layer3_id
+  storage_account_name              = module.storage.storage_account_name
   internal_key_vault_name           = module.vault.internal_key_vault_name
   depends_on_internal_vault         = module.vault.internal_vault_id
   external_key_vault_resource_group = var.external_key_vault_resource_group
   external_key_vault_name           = var.external_key_vault_name
-  admin_login = var.my_azure_login_name
+  admin_login                       = var.my_azure_login_name
 }
 
 data "azurerm_subscription" "primary" {}

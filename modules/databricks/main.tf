@@ -345,6 +345,6 @@ resource "databricks_cluster" "small" {
   num_workers             = 2
 
   # single_user set up for ability to use ML features & unity-catalog
-  data_security_mode      = "SINGLE_USER" 
-  single_user_name = var.my_databricks_id
+  data_security_mode = "SINGLE_USER"
+  single_user_name   = var.my_databricks_id
 }

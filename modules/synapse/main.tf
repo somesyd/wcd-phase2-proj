@@ -31,7 +31,7 @@ data "azurerm_key_vault_secret" "sql-password" {
 
 # create storage container for Synapse data
 data "azurerm_storage_account" "this" {
-  name = var.storage_account_name
+  name                = var.storage_account_name
   resource_group_name = data.azurerm_resource_group.this.name
 }
 
@@ -39,7 +39,6 @@ resource "azurerm_storage_data_lake_gen2_filesystem" "this" {
   name               = "synapse"
   storage_account_id = data.azurerm_storage_account.this.id
 }
-
 
 # internal key vault for synapse workspace
 data "azurerm_key_vault" "internal" {
@@ -126,13 +125,13 @@ resource "azurerm_synapse_workspace_sql_aad_admin" "example" {
 }
 
 resource "azurerm_synapse_spark_pool" "small" {
-  name                 = "smallSparkPool"
-  synapse_workspace_id = azurerm_synapse_workspace.this.id
-  node_size_family     = "MemoryOptimized"
-  node_size            = "Small"
-  node_count = 3
+  name                                = "smallSparkPool"
+  synapse_workspace_id                = azurerm_synapse_workspace.this.id
+  node_size_family                    = "MemoryOptimized"
+  node_size                           = "Small"
+  node_count                          = 3
   dynamic_executor_allocation_enabled = false
-  spark_version = "3.4"
+  spark_version                       = "3.4"
 
   auto_pause {
     delay_in_minutes = 15
@@ -143,15 +142,16 @@ resource "azurerm_synapse_spark_pool" "small" {
   ]
 }
 
-resource "azurerm_synapse_sql_pool" "small" {
-  name                 = "smallsqlpool"
-  synapse_workspace_id = azurerm_synapse_workspace.this.id
-  sku_name             = "DW100c"
-  create_mode          = "Default"
-  storage_account_type = "LRS"
-  geo_backup_policy_enabled = false
+## --- expensive resource --> use with caution
+# resource "azurerm_synapse_sql_pool" "small" {
+#   name                 = "smallsqlpool"
+#   synapse_workspace_id = azurerm_synapse_workspace.this.id
+#   sku_name             = "DW100c"
+#   create_mode          = "Default"
+#   storage_account_type = "LRS"
+#   geo_backup_policy_enabled = false
 
-  depends_on = [
-    azurerm_synapse_workspace_key.this
-  ]
-}
+#   depends_on = [
+#     azurerm_synapse_workspace_key.this
+#   ]
+# }

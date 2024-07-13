@@ -43,22 +43,8 @@ variable "meta_storage_container" {
 
 variable "synapse_container" {
   description = "Storage container name for Synapse data"
-  type = string
+  type        = string
 }
-
-# variable "sources_storage_container" {
-#   description = "Storage container name for dev tools and sources"
-#   type = string
-# }
-
-# variable "internal_key_vault_name" {
-#   description = "Name for project's internal key vault"
-#   type = string
-# }
-
-# variable "depends_on_internal_vault" {
-#   description = "Internal vault id must be create before resource runs"
-# }
 
 variable "my_databricks_id" {
   description = "Azure login name (probably email address)"

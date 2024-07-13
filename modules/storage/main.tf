@@ -46,11 +46,6 @@ resource "azurerm_storage_data_lake_gen2_filesystem" "meta" {
   storage_account_id = azurerm_storage_account.proj-sa.id
 }
 
-# resource "azurerm_storage_data_lake_gen2_filesystem" "sources" {
-#   name               = var.sources_container_name
-#   storage_account_id = azurerm_storage_account.proj-sa.id
-# }
-
 resource "azurerm_storage_data_lake_gen2_path" "proj-folders" {
   for_each = { for i, v in var.pg_tables : i => v }
 

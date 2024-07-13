@@ -23,5 +23,5 @@ variable "external_key_vault_name" {
 }
 
 variable "admin_login" {
-    description = "Azure login name (probably email address)"
+  description = "Azure login name (probably email address)"
 }
