@@ -2,18 +2,21 @@ terraform {
   required_providers {
     azurerm = {
       source  = "hashicorp/azurerm"
-      version = "3.111.0"
+      version = ">= 3.111.0"
     }
   }
 }
 
 data "azurerm_resource_group" "this" {
   name = var.resource_group_name
+  depends_on = [
+    var.depends_on_resource_group
+  ]
 }
 
 data "azurerm_client_config" "current" {}
 
-# external key vault holds Synapse SQL Server username & password
+# External key vault holds Synapse SQL Server username & password
 data "azurerm_key_vault" "external-kv" {
   name                = var.external_key_vault_name
   resource_group_name = var.external_key_vault_resource_group
@@ -29,10 +32,13 @@ data "azurerm_key_vault_secret" "sql-password" {
   key_vault_id = data.azurerm_key_vault.external-kv.id
 }
 
-# create storage container for Synapse data
+# Create storage container for Synapse data
 data "azurerm_storage_account" "this" {
   name                = var.storage_account_name
   resource_group_name = data.azurerm_resource_group.this.name
+  depends_on = [
+    var.depends_on_storage_account
+  ]
 }
 
 resource "azurerm_storage_data_lake_gen2_filesystem" "this" {
@@ -40,7 +46,7 @@ resource "azurerm_storage_data_lake_gen2_filesystem" "this" {
   storage_account_id = data.azurerm_storage_account.this.id
 }
 
-# internal key vault for synapse workspace
+# Internal key vault for synapse workspace
 data "azurerm_key_vault" "internal" {
   name                = var.internal_key_vault_name
   resource_group_name = data.azurerm_resource_group.this.name
@@ -60,7 +66,7 @@ resource "azurerm_key_vault_key" "workspace-key" {
 }
 
 resource "azurerm_synapse_workspace" "this" {
-  name                                 = "phase2-proj-synapse"
+  name                                 = "${var.prefix}-synapse"
   resource_group_name                  = data.azurerm_resource_group.this.name
   location                             = data.azurerm_resource_group.this.location
   storage_data_lake_gen2_filesystem_id = azurerm_storage_data_lake_gen2_filesystem.this.id
@@ -83,15 +89,15 @@ resource "azurerm_key_vault_access_policy" "workspace-policy" {
   object_id    = azurerm_synapse_workspace.this.identity[0].principal_id
 
   key_permissions = [
-    "Get", "WrapKey", "UnwrapKey"
+    "Get", "List", "Update", "Create", "Import", "Delete", "Recover", "Backup", "Restore", "GetRotationPolicy", "WrapKey", "UnwrapKey"
   ]
 }
 
 resource "azurerm_synapse_firewall_rule" "this" {
   name                 = "AllowAll"
   synapse_workspace_id = azurerm_synapse_workspace.this.id
-  start_ip_address     = "0.0.0.0"
-  end_ip_address       = "255.255.255.255"
+  start_ip_address     = var.ip_start_and_finish
+  end_ip_address       = var.ip_start_and_finish
 }
 
 resource "azurerm_synapse_workspace_key" "this" {
@@ -142,7 +148,7 @@ resource "azurerm_synapse_spark_pool" "small" {
   ]
 }
 
-## --- expensive resource --> use with caution
+## --- expensive resource --> USE WITH CAUTION
 # resource "azurerm_synapse_sql_pool" "small" {
 #   name                 = "smallsqlpool"
 #   synapse_workspace_id = azurerm_synapse_workspace.this.id

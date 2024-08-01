@@ -1,30 +1,17 @@
+variable "prefix" {
+  description = "Project name prefix"
+}
+
 variable "resource_group_name" {
   description = "Project resource group name"
-  type        = string
 }
 
-variable "raw_container_name" {
-  description = "Container name for raw blob storage"
-  type        = string
-  default     = "bronze"
+variable "depends_on_resource_group" {
+  description = "Dependency value to force resource group creation"
 }
 
-variable "second_level_container_name" {
-  description = "Container name for secondary storage"
-  type        = string
-  default     = "silver"
-}
-
-variable "third_level_container_name" {
-  description = "Container name for BI level storage"
-  type        = string
-  default     = "gold"
-}
-
-variable "meta_container_name" {
-  description = "Container name for databricks catalog"
-  type        = string
-  default     = "meta"
+variable "layer1_storage_container" {
+  description = "Storage container name for raw files"
 }
 
 variable "folders" {

@@ -1,26 +1,25 @@
+variable "prefix" {
+  description = "Project prefix for resource naming"
+}
+
 variable "resource_group_name" {
   description = "Project resource group name"
-  type        = string
 }
 
-variable "location" {
-  description = "Project resource group location"
-  type        = string
+variable "depends_on_resource_group" {
+  description = "Dependency value to force resource group creation"
 }
 
-variable "storage_account_id" {
-  description = "Project storage account id for Data Lake"
-  type        = string
+variable "storage_account_name" {
+  description = "Project storage account name"
 }
 
-variable "storage_account_dfs_endpoint" {
-  description = "Project storage account Data Lake endpoint"
-  type        = string
+variable "depends_on_storage_account" {
+  description = "Dependency value to force storage account creation"
 }
 
 variable "storage_container_name" {
   description = "Container name for Data Lake blob storage"
-  type        = string
 }
 
 variable "pg_tables" {

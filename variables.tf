@@ -1,3 +1,9 @@
+variable "prefix" {
+  description = "Project prefix for naming resources"
+  type        = string
+  default     = "phase2-proj"
+}
+
 variable "pg_schema" {
   description = "Schema name for Postgres dataset"
   type        = string
@@ -59,4 +65,14 @@ variable "external_key_vault_name" {
 
 variable "my_azure_login_name" {
   description = "Azure login name (probably email address)"
+}
+
+variable "databricks_account_id" {
+  description = "Databricks account ID gathered from Databricks account (add to .tfvars once workspace is created)"
+  default     = "00000000-0000-0000-0000-000000000000"
+}
+
+variable "my_ip" {
+  description = "IP address for accessing Synapse studio"
+  default     = "0.0.0.0"
 }

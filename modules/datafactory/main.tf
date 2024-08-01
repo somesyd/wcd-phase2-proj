@@ -2,7 +2,7 @@ terraform {
   required_providers {
     azurerm = {
       source  = "hashicorp/azurerm"
-      version = "3.111.0"
+      version = ">= 3.111.0"
     }
     azapi = {
       source  = "Azure/azapi"
@@ -11,10 +11,26 @@ terraform {
   }
 }
 
+data "azurerm_resource_group" "this" {
+  name = var.resource_group_name
+  depends_on = [
+    var.depends_on_resource_group
+  ]
+}
+
+data "azurerm_storage_account" "this" {
+  name                = var.storage_account_name
+  resource_group_name = data.azurerm_resource_group.this.name
+  depends_on = [
+    var.depends_on_storage_account
+  ]
+}
+
+# Create ADF and allow permissions to storage account
 resource "azurerm_data_factory" "this" {
-  name                = "phase2-project-adf"
-  location            = var.location
-  resource_group_name = var.resource_group_name
+  name                = "${var.prefix}-adf"
+  location            = data.azurerm_resource_group.this.location
+  resource_group_name = data.azurerm_resource_group.this.name
 
   identity {
     type = "SystemAssigned"
@@ -23,12 +39,10 @@ resource "azurerm_data_factory" "this" {
 
 resource "azurerm_role_assignment" "adf_blob_contributor" {
   principal_id         = azurerm_data_factory.this.identity[0].principal_id
-  scope                = var.storage_account_id
+  scope                = data.azurerm_storage_account.this.id
   role_definition_name = "Storage Blob Data Contributor"
   principal_type       = "ServicePrincipal"
 }
-
-
 
 # ********** RDS-POSTGRES-LINKED-SERVICE ****************************
 resource "azapi_resource" "rds-postgres-ls" {
@@ -64,7 +78,7 @@ resource "azurerm_data_factory_linked_service_azure_blob_storage" "wcd-blob-stor
 resource "azurerm_data_factory_linked_service_data_lake_storage_gen2" "my-data-lake-storage-ls" {
   name                 = "ls_my_data_lake"
   data_factory_id      = azurerm_data_factory.this.id
-  url                  = var.storage_account_dfs_endpoint
+  url                  = data.azurerm_storage_account.this.primary_dfs_endpoint
   use_managed_identity = true
 }
 
@@ -203,7 +217,8 @@ resource "azapi_resource" "pipeline" {
 
   depends_on = [
     azapi_resource.rds-postgres-ls,
-    azapi_resource.proj_pg_dataset
+    azapi_resource.proj_pg_dataset,
+    azurerm_data_factory_dataset_delimited_text.proj_my_blob_dataset
   ]
 }
 
