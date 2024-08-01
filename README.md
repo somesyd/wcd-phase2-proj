@@ -41,6 +41,7 @@ A `.tfvars` file is needed for other config variables
 | external_key_vault_name | Name of the config Key Vault |
 | my_azure_login_name | Your Azure login name |
 | databricks_account_id | Databricks ID from new workspace |
+| my_ip | Your IP address to connect to Synapse resources |
 
 If the `databricks_account_id` is not known, it will be generated once the workspace is created. In that case, `terraform apply` will error before building databricks resources. The account id can be found through the *databricks account console* by clicking the down arrow next to your username in the upper-right corner. Once it is added to the `.tfvars` file then run `terraform apply` again to finish building the remaining resources.
 
